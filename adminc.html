@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Student Identification Admin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: sticky progress header over a responsive photo grid; each card = photo + ID + name + confirm. */
+:root {
+  --bg: #eef2f5;
+  --surface: #ffffff;
+  --ink: #14232e;
+  --muted: #5a6b78;
+  --line: #d3dce3;
+  --accent: #0b6e82;
+  --accent-ink: #ffffff;
+  --done: #1d7a46;
+  --done-bg: #e3f3ea;
+  --warn: #a4380f;
+  --font-display: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e171d; --surface: #16232c; --ink: #e6eef3; --muted: #93a5b2; --line: #2a3b47;
+    --accent: #4fb8cc; --accent-ink: #072a33; --done: #5cc98a; --done-bg: #173626; --warn: #ff9a6b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e171d; --surface: #16232c; --ink: #e6eef3; --muted: #93a5b2; --line: #2a3b47;
+  --accent: #4fb8cc; --accent-ink: #072a33; --done: #5cc98a; --done-bg: #173626; --warn: #ff9a6b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { color-scheme: light; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-block: 0 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1120px; margin: 0 auto; }
+header { padding-block: 28px 16px; display: grid; gap: 6px; }
+h1 { font-family: var(--font-display); font-size: clamp(1.6rem, 4vw, 2.2rem); line-height: 1.15; margin: 0; text-wrap: balance; font-weight: 600; letter-spacing: -0.01em; }
+.lede { margin: 0; color: var(--muted); max-width: 62ch; }
+.bar-wrap {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line);
+  display: grid; gap: 10px;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.progress-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.count { font-family: var(--font-display); font-weight: 600; font-variant-numeric: tabular-nums; }
+.track { flex: 1 1 140px; height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; min-width: 100px; }
+.fill { height: 100%; width: 0; background: var(--done); transition: width .3s ease; }
+.tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.search { flex: 1 1 200px; min-width: 0; }
+input[type=text], input[type=search] {
+  width: 100%; font: inherit; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; min-width: 0;
+}
+input::placeholder { color: var(--muted); opacity: .8; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--muted); padding: 8px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.btn { font: inherit; font-weight: 500; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 9px 14px; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+.note.warn { color: var(--warn); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; padding-block: 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.card.done { border-color: var(--done); }
+.photo { position: relative; aspect-ratio: 3 / 4; background: var(--line); max-width: 100%; }
+.photo img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+.badge { position: absolute; top: 8px; left: 8px; font-size: 12px; font-weight: 600; background: var(--surface); color: var(--muted); padding: 2px 8px; border-radius: 99px; font-variant-numeric: tabular-nums; }
+.card.done .badge { background: var(--done); color: var(--surface); }
+.fields { padding: 10px; display: grid; gap: 8px; }
+label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: grid; gap: 3px; font-weight: 500; }
+.fields input { font-size: 14px; padding: 8px 9px; }
+.fields input:disabled { background: var(--done-bg); color: var(--ink); border-color: transparent; -webkit-text-fill-color: var(--ink); opacity: 1; }
+.err { font-size: 12px; color: var(--warn); min-height: 0; margin: 0; }
+.row { display: flex; gap: 8px; }
+.row .btn { flex: 1; padding: 8px 10px; font-size: 14px; }
+.empty { padding: 40px 0; text-align: center; color: var(--muted); }
+.meta { font-size: 12px; color: var(--muted); margin: 0; }
+.flag { font-size: 12px; color: var(--warn); margin: 0; font-weight: 500; }
+.adminbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.adminbar input { flex: 1 1 200px; }
+@media print {
+  .bar-wrap, header .lede { display: none; }
+  body { background: #fff; color: #000; }
+  .grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .card { break-inside: avoid; }
+}
+@media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="title">Student Identification</h1>
+    <p class="lede" id="lede">Find your picture. Type your student ID and full name under it, then press Confirm. Check that the picture is yours before you do.</p>
+  </header>
+  <div class="bar-wrap">
+    <div class="adminbar" id="adminbar" hidden>
+      <input id="adminkey" type="password" autocomplete="off" placeholder="Admin key" aria-label="Admin key">
+      <button class="btn" id="load" type="button">Load responses</button>
+    </div>
+    <div class="progress-row">
+      <span class="count" id="count" aria-live="polite">0 of 0 identified</span>
+      <div class="track" aria-hidden="true"><div class="fill" id="fill"></div></div>
+    </div>
+    <div class="tools">
+      <input class="search" id="search" type="search" placeholder="Search by name or ID" aria-label="Search by name or ID">
+      <div class="seg" role="group" aria-label="Filter pictures">
+        <button type="button" data-f="all" aria-pressed="true">All</button>
+        <button type="button" data-f="todo" aria-pressed="false">Not yet</button>
+        <button type="button" data-f="done" aria-pressed="false">Identified</button>
+        <button type="button" data-f="flag" aria-pressed="false" id="flagbtn" hidden>Check</button>
+      </div>
+      <button class="btn ghost" id="export" type="button" hidden>Download list (CSV)</button>
+      <button class="btn ghost" id="print" type="button" hidden>Print roster</button>
+    </div>
+    <p class="note" id="status"></p>
+  </div>
+  <main class="grid" id="grid"></main>
+  <p class="empty" id="empty" hidden>No pictures match.</p>
+</div>
+
+<script>
+(async () => {
+let PHOTOS;
+try { PHOTOS = await (await fetch('photos.json')).json(); }
+catch (e) { document.getElementById('status').textContent = 'The pictures could not be loaded. Open the page from your website link, and make sure photos.json is in the same folder as index.html.'; return; }
+let CFG = {};
+try { CFG = await (await fetch('config.json')).json(); } catch (e) { CFG = {}; }
+const COLLECTOR = String(CFG.collectorUrl || '').trim();
+const ADMIN = true;
+const SEP = COLLECTOR.indexOf('?') >= 0 ? '&' : '?';
+const grid = document.getElementById('grid');
+const $ = id => document.getElementById(id);
+let entries = {};
+let editing = new Set();
+let filter = 'all';
+let query = '';
+let db = null;
+let canWrite = true;
+let loaded = false;
+const LS = 'student-id-entries-v1';
+const cards = {};
+
+function lsRead() { try { return JSON.parse(localStorage.getItem(LS) || '{}'); } catch (e) { return {}; } }
+function lsWrite(o) { try { localStorage.setItem(LS, JSON.stringify(o)); } catch (e) {} }
+function setStatus(t, warn) { const s = $('status'); s.textContent = t || ''; s.className = 'note' + (warn ? ' warn' : ''); }
+
+PHOTOS.forEach((p, i) => {
+  const c = document.createElement('div');
+  c.className = 'card';
+  c.innerHTML =
+    '<div class="photo"><img alt="Student photo ' + (i + 1) + '" src="' + p.src + '" loading="lazy"><span class="badge">' + (i + 1) + '</span></div>' +
+    '<div class="fields">' +
+    '<label>Student ID<input type="text" class="sid" autocomplete="off" inputmode="text" id="sid-' + p.key + '"></label>' +
+    '<label>Full name<input type="text" class="nm" autocomplete="off" id="nm-' + p.key + '"></label>' +
+    '<p class="meta" hidden></p><p class="flag" hidden></p>' +
+    '<p class="err" hidden></p>' +
+    '<div class="row"><button type="button" class="btn ok">Confirm</button><button type="button" class="btn ghost chg" hidden>Change</button></div>' +
+    '</div>';
+  const q = s => c.querySelector(s);
+  const card = { el: c, sid: q('.sid'), nm: q('.nm'), err: q('.err'), ok: q('.ok'), chg: q('.chg'), meta: q('.meta'), flag: q('.flag'), p, i };
+  cards[p.key] = card;
+  card.ok.addEventListener('click', () => confirmEntry(card));
+  card.chg.addEventListener('click', () => { editing.add(p.key); paint(card); card.sid.focus(); });
+  [card.sid, card.nm].forEach(inp => inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !ADMIN) confirmEntry(card); }));
+  grid.appendChild(c);
+});
+
+function paint(card) {
+  const key = card.p.key, e = entries[key];
+  card.el.classList.toggle('done', !!e);
+  if (ADMIN) {
+    card.sid.value = e ? e.sid : '';
+    card.nm.value = e ? e.name : '';
+    card.sid.placeholder = card.nm.placeholder = e ? '' : 'Not yet';
+    card.sid.disabled = card.nm.disabled = true;
+    card.ok.hidden = card.chg.hidden = true;
+    card.meta.hidden = !e;
+    if (e) card.meta.textContent = 'Confirmed ' + new Date(e.at).toLocaleString();
+    const f = e && e.flags && e.flags.length ? e.flags.join(' ') : '';
+    card.flag.textContent = f;
+    card.flag.hidden = !f;
+    return;
+  }
+  const locked = !!e && !editing.has(key);
+  if (e && !editing.has(key)) { card.sid.value = e.sid; card.nm.value = e.name; }
+  card.sid.disabled = card.nm.disabled = locked;
+  card.ok.hidden = locked;
+  card.chg.hidden = !locked;
+  card.ok.disabled = !canWrite;
+  card.ok.textContent = e ? 'Save changes' : 'Confirm';
+}
+
+function applyFilter() {
+  const q = query.trim().toLowerCase();
+  let shown = 0;
+  Object.values(cards).forEach(card => {
+    const e = entries[card.p.key];
+    let ok = filter === 'all' || (filter === 'done' ? !!e : filter === 'todo' ? !e : !!(e && e.flags && e.flags.length));
+    if (ok && q) ok = !!e && (e.sid.toLowerCase().includes(q) || e.name.toLowerCase().includes(q));
+    card.el.hidden = !ok;
+    if (ok) shown++;
+  });
+  $('empty').hidden = shown > 0;
+}
+
+function refresh() {
+  Object.values(cards).forEach(paint);
+  const n = Object.keys(entries).filter(k => cards[k]).length;
+  $('count').textContent = n + ' of ' + PHOTOS.length + ' identified';
+  $('fill').style.width = (PHOTOS.length ? (n / PHOTOS.length * 100) : 0) + '%';
+  applyFilter();
+}
+
+const inflight = new Set();
+async function confirmEntry(card) {
+  const key = card.p.key;
+  const sid = card.sid.value.trim();
+  const name = card.nm.value.trim().replace(/\s+/g, ' ');
+  card.err.hidden = true;
+  if (!sid || !name) { card.err.textContent = 'Enter both your ID and your name.'; card.err.hidden = false; return; }
+  const dup = Object.entries(entries).find(([k, e]) => k !== key && e.sid.toLowerCase() === sid.toLowerCase());
+  if (dup) { card.err.textContent = 'This ID is already confirmed on picture ' + (cards[dup[0]].i + 1) + '.'; card.err.hidden = false; return; }
+  if (inflight.has(key)) return;
+  inflight.add(key);
+  card.ok.disabled = true;
+  const rec = { sid, name, file: card.p.file, at: Date.now() };
+  try {
+    if (COLLECTOR) {
+      const qs = new URLSearchParams({ action: 'submit', key, file: rec.file, sid, name }).toString();
+      const r = await fetch(COLLECTOR + SEP + qs);
+      const j = await r.json();
+      if (!j || !j.ok) throw new Error('rejected');
+      const o = lsRead(); o[key] = rec; lsWrite(o);
+    } else if (db) { await db.doc('entries/' + key).set(rec); }
+    else { const o = lsRead(); o[key] = rec; lsWrite(o); }
+    entries[key] = rec;
+    editing.delete(key);
+  } catch (e) {
+    if (e && e.code === 'invalid_argument') { canWrite = false; setStatus('You can see the board but not save to it. Ask your teacher for contributor access.', true); }
+    else { card.err.textContent = 'Could not save. Check your connection and try again.'; card.err.hidden = false; }
+  } finally {
+    inflight.delete(key);
+    refresh();
+  }
+}
+
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+  filter = b.dataset.f;
+  document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  applyFilter();
+}));
+$('search').addEventListener('input', e => { query = e.target.value; applyFilter(); });
+
+function csvCell(v) { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+function buildCsv() {
+  const rows = [['Picture no.', 'Student ID', 'Full name', 'Photo file', 'Confirmed at', 'Notes']];
+  PHOTOS.forEach((p, i) => {
+    const e = entries[p.key];
+    rows.push([i + 1, e ? e.sid : '', e ? e.name : '', p.file, e ? new Date(e.at).toISOString() : '', e && e.flags ? e.flags.join(' ') : '']);
+  });
+  return rows.map(r => r.map(csvCell).join(',')).join('\n');
+}
+$('export').addEventListener('click', async () => {
+  const csv = buildCsv();
+  if (ADMIN) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv' }));
+    a.download = 'student-identification.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    return;
+  }
+  try {
+    const dl = await claude.use('downloads');
+    if (dl) await dl.save({ filename: 'student-identification.csv', data: csv });
+  } catch (e) { if (!e || e.code !== 'declined') setStatus('The file could not be saved here.', true); }
+});
+$('print').addEventListener('click', () => window.print());
+
+async function loadAdmin() {
+  const key = $('adminkey').value.trim();
+  if (!key) { setStatus('Enter the admin key first.', true); return; }
+  setStatus('Loading responses...');
+  $('load').disabled = true;
+  try {
+    const r = await fetch(COLLECTOR + SEP + 'action=list&admin=' + encodeURIComponent(key));
+    const j = await r.json();
+    if (!j || !j.ok) { setStatus(j && j.error === 'forbidden' ? 'That admin key is wrong.' : 'The responses could not be loaded.', true); return; }
+    const rows = (j.rows || []).filter(x => cards[x.key]).sort((a, b) => a.t - b.t);
+    const latest = {}, variants = {}, counts = {};
+    rows.forEach(x => {
+      latest[x.key] = { sid: String(x.sid), name: String(x.name), at: x.t };
+      (variants[x.key] = variants[x.key] || new Set()).add((String(x.sid) + '|' + String(x.name)).toLowerCase());
+      counts[x.key] = (counts[x.key] || 0) + 1;
+    });
+    const bySid = {};
+    Object.entries(latest).forEach(([k, e]) => { const s = e.sid.toLowerCase(); (bySid[s] = bySid[s] || []).push(k); });
+    Object.entries(latest).forEach(([k, e]) => {
+      e.flags = [];
+      if (variants[k].size > 1) e.flags.push('Entered ' + counts[k] + ' times with different answers.');
+      const others = bySid[e.sid.toLowerCase()].filter(x => x !== k);
+      if (others.length) e.flags.push('This ID is also on picture ' + others.map(x => cards[x].i + 1).join(', ') + '.');
+    });
+    entries = latest;
+    $('export').hidden = false; $('print').hidden = false;
+    try { sessionStorage.setItem('sid-admin-key', key); } catch (e) {}
+    setStatus('Loaded ' + rows.length + ' responses. Showing the latest answer for each picture.');
+    refresh();
+  } catch (e) {
+    setStatus('Could not reach the collector. Check the web app URL in index.html.', true);
+  } finally { $('load').disabled = false; }
+}
+
+refresh();
+
+(async () => {
+  if (ADMIN) {
+    $('title').textContent = 'Student Identification: Admin';
+    $('lede').textContent = 'Every picture with the latest ID and name entered for it. Pictures marked Check have repeated or conflicting answers.';
+    $('adminbar').hidden = false; $('flagbtn').hidden = false;
+    $('load').addEventListener('click', loadAdmin);
+    $('adminkey').addEventListener('keydown', e => { if (e.key === 'Enter') loadAdmin(); });
+    if (!COLLECTOR) { setStatus('Add your Google Apps Script URL to index.html first (see the setup steps).', true); $('load').disabled = true; return; }
+    try { const k = sessionStorage.getItem('sid-admin-key'); if (k) { $('adminkey').value = k; loadAdmin(); } } catch (e) {}
+    return;
+  }
+  if (COLLECTOR) { entries = lsRead(); refresh(); return; }
+  let timer = setTimeout(() => { if (!loaded) setStatus('Still connecting. What you see may be out of date.', true); }, 10000);
+  try { db = await claude.use('db'); } catch (e) { db = null; }
+  try {
+    const user = await claude.use('user');
+    if (user && user.canEdit && user.canEdit()) $('export').hidden = false;
+  } catch (e) {}
+  if (!db) {
+    clearTimeout(timer); loaded = true;
+    entries = lsRead();
+    setStatus('Saving on this device only.');
+    refresh();
+    return;
+  }
+  db.collection('entries').onSnapshot(snap => {
+    const next = {};
+    snap.docs.forEach(d => { const v = d.data(); if (v && v.sid) next[d.id] = v; });
+    entries = next;
+    if (!snap.metadata.fromCache) { loaded = true; clearTimeout(timer); setStatus(''); }
+    refresh();
+  }, err => { clearTimeout(timer); setStatus('The class list could not be loaded. Reload the page to try again.', true); });
+})();
+})();
+</script>
+</body>
+</html>
