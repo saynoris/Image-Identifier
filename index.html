@@ -99,11 +99,6 @@ label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color
 }
 @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
 </style>
-<script>
-/* Paste your Google Apps Script web app URL (it ends in /exec) between the quotes. */
-window.CONFIG = { collectorUrl: '' };
-</script>
-<script src="photos.js"></script>
 
 </head>
 <body>
@@ -139,9 +134,14 @@ window.CONFIG = { collectorUrl: '' };
 </div>
 
 <script>
-const CFG = window.CONFIG || {};
+(async () => {
+let PHOTOS;
+try { PHOTOS = await (await fetch('photos.json')).json(); }
+catch (e) { document.getElementById('status').textContent = 'The pictures could not be loaded. Open the page from your website link, and make sure photos.json is in the same folder as index.html.'; return; }
+let CFG = {};
+try { CFG = await (await fetch('config.json')).json(); } catch (e) { CFG = {}; }
 const COLLECTOR = String(CFG.collectorUrl || '').trim();
-const ADMIN = location.hash === '#admin';
+const ADMIN = false;
 const SEP = COLLECTOR.indexOf('?') >= 0 ? '&' : '?';
 const grid = document.getElementById('grid');
 const $ = id => document.getElementById(id);
@@ -359,6 +359,7 @@ refresh();
     if (!snap.metadata.fromCache) { loaded = true; clearTimeout(timer); setStatus(''); }
     refresh();
   }, err => { clearTimeout(timer); setStatus('The class list could not be loaded. Reload the page to try again.', true); });
+})();
 })();
 </script>
 </body>
