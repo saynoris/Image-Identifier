@@ -242,9 +242,13 @@ async function confirmEntry(card) {
   try {
     if (COLLECTOR) {
       const qs = new URLSearchParams({ action: 'submit', key, file: rec.file, sid, name }).toString();
-      const r = await fetch(COLLECTOR + SEP + qs);
-      const j = await r.json();
-      if (!j || !j.ok) throw new Error('rejected');
+      let r;
+      try { r = await fetch(COLLECTOR + SEP + qs); }
+      catch (ne) { const x = new Error('net'); x.why = 'Could not reach Google. The link in config.json may be wrong, access may not be set to Anyone, or this network blocks Google.'; throw x; }
+      let j;
+      try { j = await r.json(); }
+      catch (pe) { const x = new Error('parse'); x.why = 'Google sent a web page instead of data (status ' + r.status + '). In Apps Script set Who has access to Anyone, then deploy a New version.'; throw x; }
+      if (!j || !j.ok) { const x = new Error('rejected'); x.why = 'Google answered with an error: ' + (j && j.error ? j.error : 'unknown') + '.'; throw x; }
       const o = lsRead(); o[key] = rec; lsWrite(o);
     } else if (db) { await db.doc('entries/' + key).set(rec); }
     else { const o = lsRead(); o[key] = rec; lsWrite(o); }
@@ -252,7 +256,7 @@ async function confirmEntry(card) {
     editing.delete(key);
   } catch (e) {
     if (e && e.code === 'invalid_argument') { canWrite = false; setStatus('You can see the board but not save to it. Ask your teacher for contributor access.', true); }
-    else { card.err.textContent = 'Could not save. Check your connection and try again.'; card.err.hidden = false; }
+    else { card.err.textContent = (e && e.why) ? e.why : 'Could not save. Check your connection and try again.'; card.err.hidden = false; }
   } finally {
     inflight.delete(key);
     refresh();
@@ -338,7 +342,10 @@ refresh();
     try { const k = sessionStorage.getItem('sid-admin-key'); if (k) { $('adminkey').value = k; loadAdmin(); } } catch (e) {}
     return;
   }
-  if (COLLECTOR) { entries = lsRead(); refresh(); return; }
+  if (COLLECTOR) {
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/[^\/\s]+\/exec$/.test(COLLECTOR)) setStatus('The link in config.json does not look right. It should start with https://script.google.com/macros/s/ and end with /exec, with nothing else around it.', true);
+    entries = lsRead(); refresh(); return;
+  }
   let timer = setTimeout(() => { if (!loaded) setStatus('Still connecting. What you see may be out of date.', true); }, 10000);
   try { db = await claude.use('db'); } catch (e) { db = null; }
   try {
