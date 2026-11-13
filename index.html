@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Student Identification Page</title>
+<title>Student Identification</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
 <style>
 /* Layout: sticky progress header over a responsive photo grid; each card = photo + ID + name + confirm. */
@@ -152,7 +152,7 @@ let query = '';
 let db = null;
 let canWrite = true;
 let loaded = false;
-const LS = 'student-id-entries-v1';
+const LS = 'student-id-entries-v2';
 const cards = {};
 
 function lsRead() { try { return JSON.parse(localStorage.getItem(LS) || '{}'); } catch (e) { return {}; } }
