@@ -152,7 +152,7 @@ let query = '';
 let db = null;
 let canWrite = true;
 let loaded = false;
-const LS = 'student-id-entries-v1';
+const LS = 'student-id-entries-v2';
 const cards = {};
 
 function lsRead() { try { return JSON.parse(localStorage.getItem(LS) || '{}'); } catch (e) { return {}; } }
