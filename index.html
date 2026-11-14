@@ -34,6 +34,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { color-scheme: light; }
 body {
   background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
@@ -109,8 +110,8 @@ label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color
   </header>
   <div class="bar-wrap">
     <div class="adminbar" id="adminbar" hidden>
-      <input id="adminkey" type="password" autocomplete="off" placeholder="Admin key" aria-label="Admin key">
-      <button class="btn" id="load" type="button">Load responses</button>
+      <input id="csvfile" type="file" accept=".csv,text/csv" aria-label="Responses CSV file">
+      <button class="btn" id="load" type="button">Show responses</button>
     </div>
     <div class="progress-row">
       <span class="count" id="count" aria-live="polite">0 of 0 identified</span>
@@ -140,9 +141,20 @@ try { PHOTOS = await (await fetch('photos.json')).json(); }
 catch (e) { document.getElementById('status').textContent = 'The pictures could not be loaded. Open the page from your website link, and make sure photos.json is in the same folder as index.html.'; return; }
 let CFG = {};
 try { CFG = await (await fetch('config.json')).json(); } catch (e) { CFG = {}; }
-const COLLECTOR = String(CFG.collectorUrl || '').trim();
+const FORM = (function () {
+  const u = String(CFG.formUrl || '').trim();
+  if (!u) return null;
+  try {
+    const url = new URL(u);
+    const m = url.pathname.match(/^\/forms\/d\/e\/([^\/]+)\//);
+    if (url.hostname !== 'docs.google.com' || !m) return { bad: true };
+    const map = {};
+    url.searchParams.forEach((v, k) => { if (/^entry\.\d+$/.test(k)) map[String(v).trim().toUpperCase()] = k; });
+    if (!map.KEY || !map.FILE || !map.SID || !map.NAME) return { bad: true };
+    return { action: 'https://docs.google.com/forms/d/e/' + m[1] + '/formResponse', key: map.KEY, file: map.FILE, sid: map.SID, name: map.NAME };
+  } catch (e) { return { bad: true }; }
+})();
 const ADMIN = false;
-const SEP = COLLECTOR.indexOf('?') >= 0 ? '&' : '?';
 const grid = document.getElementById('grid');
 const $ = id => document.getElementById(id);
 let entries = {};
@@ -190,7 +202,7 @@ function paint(card) {
     card.sid.disabled = card.nm.disabled = true;
     card.ok.hidden = card.chg.hidden = true;
     card.meta.hidden = !e;
-    if (e) card.meta.textContent = 'Confirmed ' + new Date(e.at).toLocaleString();
+    if (e) card.meta.textContent = 'Confirmed ' + (e.atText || new Date(e.at).toLocaleString());
     const f = e && e.flags && e.flags.length ? e.flags.join(' ') : '';
     card.flag.textContent = f;
     card.flag.hidden = !f;
@@ -240,15 +252,13 @@ async function confirmEntry(card) {
   card.ok.disabled = true;
   const rec = { sid, name, file: card.p.file, at: Date.now() };
   try {
-    if (COLLECTOR) {
-      const qs = new URLSearchParams({ action: 'submit', key, file: rec.file, sid, name }).toString();
-      let r;
-      try { r = await fetch(COLLECTOR + SEP + qs); }
-      catch (ne) { const x = new Error('net'); x.why = 'Could not reach Google. The link in config.json may be wrong, access may not be set to Anyone, or this network blocks Google.'; throw x; }
-      let j;
-      try { j = await r.json(); }
-      catch (pe) { const x = new Error('parse'); x.why = 'Google sent a web page instead of data (status ' + r.status + '). In Apps Script set Who has access to Anyone, then deploy a New version.'; throw x; }
-      if (!j || !j.ok) { const x = new Error('rejected'); x.why = 'Google answered with an error: ' + (j && j.error ? j.error : 'unknown') + '.'; throw x; }
+    if (FORM && FORM.bad) {
+      const x = new Error('cfg'); x.why = 'The form link in config.json is not set up correctly. Ask your teacher to check it.'; throw x;
+    } else if (FORM) {
+      const body = new URLSearchParams();
+      body.set(FORM.key, key); body.set(FORM.file, rec.file); body.set(FORM.sid, sid); body.set(FORM.name, name);
+      try { await fetch(FORM.action, { method: 'POST', mode: 'no-cors', body }); }
+      catch (ne) { const x = new Error('net'); x.why = 'Could not reach Google. Check your internet connection and try again.'; throw x; }
       const o = lsRead(); o[key] = rec; lsWrite(o);
     } else if (db) { await db.doc('entries/' + key).set(rec); }
     else { const o = lsRead(); o[key] = rec; lsWrite(o); }
@@ -275,7 +285,7 @@ function buildCsv() {
   const rows = [['Picture no.', 'Student ID', 'Full name', 'Photo file', 'Confirmed at', 'Notes']];
   PHOTOS.forEach((p, i) => {
     const e = entries[p.key];
-    rows.push([i + 1, e ? e.sid : '', e ? e.name : '', p.file, e ? new Date(e.at).toISOString() : '', e && e.flags ? e.flags.join(' ') : '']);
+    rows.push([i + 1, e ? e.sid : '', e ? e.name : '', p.file, e ? (e.atText || new Date(e.at).toISOString()) : '', e && e.flags ? e.flags.join(' ') : '']);
   });
   return rows.map(r => r.map(csvCell).join(',')).join('\n');
 }
@@ -295,38 +305,54 @@ $('export').addEventListener('click', async () => {
 });
 $('print').addEventListener('click', () => window.print());
 
+function parseCsv(text) {
+  text = text.replace(/^﻿/, '');
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+    else if (c !== '\r') cell += c;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+
 async function loadAdmin() {
-  const key = $('adminkey').value.trim();
-  if (!key) { setStatus('Enter the admin key first.', true); return; }
-  setStatus('Loading responses...');
-  $('load').disabled = true;
-  try {
-    const r = await fetch(COLLECTOR + SEP + 'action=list&admin=' + encodeURIComponent(key));
-    const j = await r.json();
-    if (!j || !j.ok) { setStatus(j && j.error === 'forbidden' ? 'That admin key is wrong.' : 'The responses could not be loaded.', true); return; }
-    const rows = (j.rows || []).filter(x => cards[x.key]).sort((a, b) => a.t - b.t);
-    const latest = {}, variants = {}, counts = {};
-    rows.forEach(x => {
-      latest[x.key] = { sid: String(x.sid), name: String(x.name), at: x.t };
-      (variants[x.key] = variants[x.key] || new Set()).add((String(x.sid) + '|' + String(x.name)).toLowerCase());
-      counts[x.key] = (counts[x.key] || 0) + 1;
-    });
-    const bySid = {};
-    Object.entries(latest).forEach(([k, e]) => { const s = e.sid.toLowerCase(); (bySid[s] = bySid[s] || []).push(k); });
-    Object.entries(latest).forEach(([k, e]) => {
-      e.flags = [];
-      if (variants[k].size > 1) e.flags.push('Entered ' + counts[k] + ' times with different answers.');
-      const others = bySid[e.sid.toLowerCase()].filter(x => x !== k);
-      if (others.length) e.flags.push('This ID is also on picture ' + others.map(x => cards[x].i + 1).join(', ') + '.');
-    });
-    entries = latest;
-    $('export').hidden = false; $('print').hidden = false;
-    try { sessionStorage.setItem('sid-admin-key', key); } catch (e) {}
-    setStatus('Loaded ' + rows.length + ' responses. Showing the latest answer for each picture.');
-    refresh();
-  } catch (e) {
-    setStatus('Could not reach the collector. Check the web app URL in index.html.', true);
-  } finally { $('load').disabled = false; }
+  const f = $('csvfile').files[0];
+  if (!f) { setStatus('Choose the CSV file you downloaded from your Google Sheet first.', true); return; }
+  let rows;
+  try { rows = parseCsv(await f.text()); } catch (e) { setStatus('That file could not be read.', true); return; }
+  if (rows.length < 1) { setStatus('That file is empty.', true); return; }
+  const head = rows[0].map(h => String(h).trim().toLowerCase());
+  const col = fn => head.findIndex(fn);
+  const ki = col(h => h.includes('key')), si = col(h => h.includes('student')), ni = col(h => h.includes('name') && !h.includes('file')), ti = col(h => h.includes('timestamp'));
+  if (ki < 0 || si < 0 || ni < 0) { setStatus('This does not look like the responses file. It needs the columns Photo key, Student ID and Full name.', true); return; }
+  const latest = {}, variants = {}, counts = {};
+  let used = 0;
+  rows.slice(1).forEach(r => {
+    const key = String(r[ki] || '').trim(), sid = String(r[si] || '').trim(), name = String(r[ni] || '').trim();
+    if (!key || !sid || !name || !cards[key]) return;
+    used++;
+    const ts = ti >= 0 ? String(r[ti] || '').trim() : '';
+    latest[key] = { sid, name, at: Date.parse(ts) || 0, atText: ts };
+    (variants[key] = variants[key] || new Set()).add((sid + '|' + name).toLowerCase());
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  const bySid = {};
+  Object.entries(latest).forEach(([k, e]) => { const s = e.sid.toLowerCase(); (bySid[s] = bySid[s] || []).push(k); });
+  Object.entries(latest).forEach(([k, e]) => {
+    e.flags = [];
+    if (variants[k].size > 1) e.flags.push('Entered ' + counts[k] + ' times with different answers.');
+    const others = bySid[e.sid.toLowerCase()].filter(x => x !== k);
+    if (others.length) e.flags.push('This ID is also on picture ' + others.map(x => cards[x].i + 1).join(', ') + '.');
+  });
+  entries = latest;
+  $('export').hidden = false; $('print').hidden = false;
+  setStatus('Showing ' + Object.keys(latest).length + ' pictures with answers, from ' + used + ' responses. The latest answer for each picture is shown.');
+  refresh();
 }
 
 refresh();
@@ -334,16 +360,13 @@ refresh();
 (async () => {
   if (ADMIN) {
     $('title').textContent = 'Student Identification: Admin';
-    $('lede').textContent = 'Every picture with the latest ID and name entered for it. Pictures marked Check have repeated or conflicting answers.';
+    $('lede').textContent = 'Download the responses from your Google Sheet as a CSV file, choose it below, and every picture appears with its ID and name. Pictures marked Check have repeated or conflicting answers.';
     $('adminbar').hidden = false; $('flagbtn').hidden = false;
     $('load').addEventListener('click', loadAdmin);
-    $('adminkey').addEventListener('keydown', e => { if (e.key === 'Enter') loadAdmin(); });
-    if (!COLLECTOR) { setStatus('Add your Google Apps Script URL to index.html first (see the setup steps).', true); $('load').disabled = true; return; }
-    try { const k = sessionStorage.getItem('sid-admin-key'); if (k) { $('adminkey').value = k; loadAdmin(); } } catch (e) {}
-    return;
+        return;
   }
-  if (COLLECTOR) {
-    if (!/^https:\/\/script\.google\.com\/macros\/s\/[^\/\s]+\/exec$/.test(COLLECTOR)) setStatus('The link in config.json does not look right. It should start with https://script.google.com/macros/s/ and end with /exec, with nothing else around it.', true);
+  if (FORM) {
+    if (FORM.bad) setStatus('The form link in config.json is not set up correctly. It needs the pre-filled link with KEY, FILE, SID and NAME typed into the four questions.', true);
     entries = lsRead(); refresh(); return;
   }
   let timer = setTimeout(() => { if (!loaded) setStatus('Still connecting. What you see may be out of date.', true); }, 10000);
