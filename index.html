@@ -140,7 +140,7 @@ let PHOTOS;
 try { PHOTOS = await (await fetch('photos.json')).json(); }
 catch (e) { document.getElementById('status').textContent = 'The pictures could not be loaded. Open the page from your website link, and make sure photos.json is in the same folder as index.html.'; return; }
 let CFG = {};
-try { CFG = await (await fetch('config.json')).json(); } catch (e) { CFG = {}; }
+try { CFG = await (await fetch('config.json?t=' + Date.now(), { cache: 'no-store' })).json(); } catch (e) { CFG = {}; }
 const FORM = (function () {
   const u = String(CFG.formUrl || '').trim();
   if (!u) return null;
@@ -255,9 +255,9 @@ async function confirmEntry(card) {
     if (FORM && FORM.bad) {
       const x = new Error('cfg'); x.why = 'The form link in config.json is not set up correctly. Ask your teacher to check it.'; throw x;
     } else if (FORM) {
-      const body = new URLSearchParams();
-      body.set(FORM.key, key); body.set(FORM.file, rec.file); body.set(FORM.sid, sid); body.set(FORM.name, name);
-      try { await fetch(FORM.action, { method: 'POST', mode: 'no-cors', body }); }
+      const q = new URLSearchParams();
+      q.set(FORM.key, key); q.set(FORM.file, rec.file); q.set(FORM.sid, sid); q.set(FORM.name, name); q.set('submit', 'Submit');
+      try { await fetch(FORM.action + '?' + q.toString(), { mode: 'no-cors', cache: 'no-store' }); }
       catch (ne) { const x = new Error('net'); x.why = 'Could not reach Google. Check your internet connection and try again.'; throw x; }
       const o = lsRead(); o[key] = rec; lsWrite(o);
     } else if (db) { await db.doc('entries/' + key).set(rec); }
