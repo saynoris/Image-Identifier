@@ -367,6 +367,7 @@ refresh();
   }
   if (FORM) {
     if (FORM.bad) setStatus('The form link in config.json is not set up correctly. It needs the pre-filled link with KEY, FILE, SID and NAME typed into the four questions.', true);
+    else setStatus('Form link loaded. Your answers are sent to the class form.');
     entries = lsRead(); refresh(); return;
   }
   let timer = setTimeout(() => { if (!loaded) setStatus('Still connecting. What you see may be out of date.', true); }, 10000);
