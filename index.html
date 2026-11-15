@@ -139,9 +139,9 @@ label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color
 let PHOTOS;
 try { PHOTOS = await (await fetch('photos.json')).json(); }
 catch (e) { document.getElementById('status').textContent = 'The pictures could not be loaded. Open the page from your website link, and make sure photos.json is in the same folder as index.html.'; return; }
-const VERSION = 'v6';
+const VERSION = 'v7';
 /* The form link is built into this page. No other file is needed for it. */
-const CFG = { formUrl: 'https://docs.google.com/forms/d/e/1FAIpQLScp6IAoK2CCxLGxac82Tc8wx_bcAiiF51tJMA8WNcEk95gjxw/viewform?usp=pp_url&entry.11202372=KEY&entry.1759204116=FILE&entry.371872434=SID&entry.1828617015=NAME' };
+const CFG = { formUrl: 'https://docs.google.com/forms/d/e/1FAIpQLSdOkJwZ3w3XDyxb9TbcfAOV7jDhvzQrNeqnkFvg3GjNJrXduA/viewform?usp=pp_url&entry.11202372=KEY&entry.1759204116=FILE&entry.371872434=SID&entry.1828617015=NAME' };
 const FORM = (function () {
   const u = String(CFG.formUrl || '').trim();
   if (!u) return null;
