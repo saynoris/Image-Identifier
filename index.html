@@ -139,8 +139,9 @@ label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color
 let PHOTOS;
 try { PHOTOS = await (await fetch('photos.json')).json(); }
 catch (e) { document.getElementById('status').textContent = 'The pictures could not be loaded. Open the page from your website link, and make sure photos.json is in the same folder as index.html.'; return; }
-let CFG = {};
-try { CFG = await (await fetch('config.json?t=' + Date.now(), { cache: 'no-store' })).json(); } catch (e) { CFG = {}; }
+const VERSION = 'v6';
+/* The form link is built into this page. No other file is needed for it. */
+const CFG = { formUrl: 'https://docs.google.com/forms/d/e/1FAIpQLScp6IAoK2CCxLGxac82Tc8wx_bcAiiF51tJMA8WNcEk95gjxw/viewform?usp=pp_url&entry.11202372=KEY&entry.1759204116=FILE&entry.371872434=SID&entry.1828617015=NAME' };
 const FORM = (function () {
   const u = String(CFG.formUrl || '').trim();
   if (!u) return null;
@@ -261,7 +262,7 @@ async function confirmEntry(card) {
       catch (ne) { const x = new Error('net'); x.why = 'Could not reach Google. Check your internet connection and try again.'; throw x; }
       const o = lsRead(); o[key] = rec; lsWrite(o);
     } else if (db) { await db.doc('entries/' + key).set(rec); }
-    else { const o = lsRead(); o[key] = rec; lsWrite(o); }
+    else { const x = new Error('nocfg'); x.why = 'This page is not connected to the class form, so nothing was sent. Tell your teacher.'; throw x; }
     entries[key] = rec;
     editing.delete(key);
   } catch (e) {
@@ -367,7 +368,7 @@ refresh();
   }
   if (FORM) {
     if (FORM.bad) setStatus('The form link in config.json is not set up correctly. It needs the pre-filled link with KEY, FILE, SID and NAME typed into the four questions.', true);
-    else setStatus('Form link loaded. Your answers are sent to the class form.');
+    else setStatus('Page ' + VERSION + '. Form link loaded. Your answers are sent to the class form.');
     entries = lsRead(); refresh(); return;
   }
   let timer = setTimeout(() => { if (!loaded) setStatus('Still connecting. What you see may be out of date.', true); }, 10000);
@@ -379,7 +380,7 @@ refresh();
   if (!db) {
     clearTimeout(timer); loaded = true;
     entries = lsRead();
-    setStatus('Saving on this device only.');
+    setStatus('Page ' + VERSION + '. Not connected to the class form. Entries will not be sent.', true);
     refresh();
     return;
   }
